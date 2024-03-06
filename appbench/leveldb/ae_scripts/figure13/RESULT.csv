@@ -1,0 +1,10 @@
+-----------------------
+Table for fillrandom
+-----------------------
+Threads,FusionFS,HostCache-user-level,OmniCache
+fillrandom,30.5,32.9,33.4
+-----------------------
+Table for readrandom
+-----------------------
+Threads,FusionFS,HostCache-user-level,OmniCache
+readrandom,196.2,335.0,373.4
