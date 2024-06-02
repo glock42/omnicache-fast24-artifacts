@@ -381,8 +381,8 @@ int insert_cmd_to_interval_node(ufile *fp, struct req_tree_entry *node, char *bu
                 ret += copy_size;
         }
 #else
-        debug_printf("insert_cmd_to_interval_node, start: %ld, end: %ld, node_s: %ld, node_e: %ld, idx_start:%d, idx_end:%d\n", 
-                start, end, node->it.start, node->it.last,idx_start, idx_end);
+        /* printf("insert_cmd_to_interval_node, start: %ld, end: %ld, node_s: %ld, node_e: %ld, idx_start:%d, idx_end:%d\n",  */
+                /* start, end, node->it.start, node->it.last,idx_start, idx_end); */
         if (node->size <= 0 || node->blk_addr == NULL) {
             node->blk_addr = (void*)malloc(NODE_SIZE_LIMIT);
             node->buf_start = start;
@@ -406,6 +406,7 @@ int insert_cmd_to_interval_node(ufile *fp, struct req_tree_entry *node, char *bu
             }
 #endif
             if (node->in_lru_list == 0) {
+                /* printf("add to lru\n"); */
                 add_to_lru_list(&node->lru_node, &lru_list_tail, &lru_interval_nodes_list_lock);
                 node->in_lru_list = 1;
             }
@@ -905,12 +906,17 @@ int cache_insert(uinode *inode, void* blk_addr, unsigned long slba, unsigned lon
                 printf("root is null\n");
         }
 
-        unsigned long cache_size_upper_bound = CACHE_LIMIT + (CACHE_LIMIT/5)*4;
+        //unsigned long cache_size_upper_bound = CACHE_LIMIT + (CACHE_LIMIT/5)*4;
+        unsigned long cache_size_upper_bound = CACHE_LIMIT;
 
+        /* printf("cache insert, slba: %ld, nlb: %ld, fname: %s\n", slba, nlb, fp->fname); */
 
 #if 1
         if(cache_size > cache_size_upper_bound ) {
+                
+                printf("eviction, cache size: %ld, slba: %ld, nlb: %ld, fname: %s\n", cache_size, slba, nlb, fp->fname);
                 evict_interval_nodes();
+                printf("eviction done, cache size: %ld, slba: %ld, nlb: %ld, fname: %s\n", cache_size, slba, nlb, fp->fname);
         }
 #endif
 
@@ -1021,6 +1027,11 @@ int flush_tree_node(ufile *fp, struct req_tree_entry *tree_node) {
                 /* cache_size -= NODE_SIZE_LIMIT; */
                 __sync_sub_and_fetch(&cache_size, NODE_SIZE_LIMIT);
                 __sync_sub_and_fetch(&dev_cache_size, NODE_SIZE_LIMIT);
+                if (tree_node->in_lru_list) {
+                    /* printf("remove from list\n"); */
+                    remove_from_lru_list(&tree_node->lru_node, &lru_interval_nodes_list_lock);
+                    tree_node->in_lru_list = 0;
+                }
                 goto exit_flush_tree_node;
         }
 #endif
@@ -1316,10 +1327,11 @@ void evict_closed_files() {
 void evict_interval_nodes() {
         struct req_tree_entry *evict_tree_node = NULL;
 	    uinode *inode = NULL;
-        unsigned long cache_size_stop = cache_size * 0.9;
+        unsigned long cache_size_stop = cache_size * 0.7;
 
         if (stopeviction) return;
-        /* while(cache_size >= cache_size_stop) { */
+        /* printf("evict interval node, cachesize: %ld\n", cache_size); */
+        while(cache_size >= cache_size_stop) {
 
                 crfs_mutex_lock(&lru_interval_nodes_list_lock);
                 if (lru_list_head.next != &lru_list_tail) {
@@ -1351,7 +1363,7 @@ void evict_interval_nodes() {
                 }
 #else
                 crfs_rwlock_wrlock(&inode->cache_tree_lock);
-                flush_tree_node_batch(evict_tree_node->fp, evict_tree_node);
+                flush_tree_node(evict_tree_node->fp, evict_tree_node);
                 /* interval_tree_remove(&evict_tree_node->it, &inode->cache_tree); */
 
                 /* crfs_free(evict_tree_node); */
@@ -1361,7 +1373,7 @@ void evict_interval_nodes() {
 
                 crfs_rwlock_unlock(&inode->cache_tree_lock);
 #endif
-        /* } */
+        }
 }
 
 

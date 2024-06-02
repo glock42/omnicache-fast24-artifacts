@@ -1331,6 +1331,42 @@ int shutdown_crfs()
 	return 0;
 }
 
+#define QUEUES 32 
+
+threadpool_t *pool[QUEUES];
+int g_next_queue=0;
+
+struct prefetch_args{
+    int fd; //fd of opened file
+    long size; //bytes to fetch from this thread
+    long nr_read_pg; //nr of pages to read each req
+    size_t offset; //Offset of file where RA to start from
+    unsigned long read_time; //Return value, time taken to read the file in microsec
+};
+ 
+void prefetcher_thread(void *arg) {
+
+    off_t prefetch_size = 0;
+    struct prefetch_args *prefetch_arg = (struct prefetch_args*)arg;
+
+
+    // TODO
+    //prefetch_size = get_prefetch_size(prefetch_arg);
+    
+
+}
+
+void prefetcher(int fd, size_t size, off_t offset) {
+
+    struct prefetch_args *prefetch_arg = (struct prefetch_args*)malloc(sizeof(struct prefetch_args));
+
+    prefetch_arg->fd = fd;
+    prefetch_arg->size = size;
+    prefetch_arg->offset = offset;
+
+    threadpool_add(pool[g_next_queue % QUEUES], prefetcher_thread, (void*)prefetch_arg, 0);
+}
+
 
 /****************************************************************
  * Entry function for each POSIX I/O syscalls for DevFS
